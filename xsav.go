@@ -28,6 +28,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"bitbucket.org/bergenquete/xml2sav/sav"
 )
 
 type labelXML struct {
@@ -74,7 +76,7 @@ func parseXSav(in io.Reader, basename string, lengths VarLengths) error {
 	bareBasename := strings.TrimSuffix(basename, filepath.Ext(basename))
 	var filename string
 	var f *os.File
-	var out *SpssWriter
+	var out *sav.SpssWriter
 	var dictDone bool
 	var savname string
 
@@ -97,7 +99,7 @@ func parseXSav(in io.Reader, basename string, lengths VarLengths) error {
 				if err != nil {
 					return err
 				}
-				out = NewSpssWriter(f)
+				out = sav.NewSpssWriter(f)
 				log.Println("Writing", filename)
 			case "var":
 				if dictDone {
@@ -112,14 +114,14 @@ func parseXSav(in io.Reader, basename string, lengths VarLengths) error {
 					return err
 				}
 
-				v := new(Var)
+				v := new(sav.Var)
 				v.Name = varxml.Name
-				v.Type = SPSS_NUMERIC
-				v.Measure = SPSS_MLVL_NOM
+				v.Type = sav.SPSS_NUMERIC
+				v.Measure = sav.SPSS_MLVL_NOM
 				switch varxml.Type {
 				case "numeric":
 					v.Decimals = varxml.Decimals
-					v.Print = SPSS_FMT_F
+					v.Print = sav.SPSS_FMT_F
 					v.Width = 8
 					if hasAttr(&t, "width") {
 						v.Width = byte(varxml.Width)
@@ -129,15 +131,15 @@ func parseXSav(in io.Reader, basename string, lengths VarLengths) error {
 						v.Decimals = byte(varxml.Decimals)
 					}
 				case "date":
-					v.Print = SPSS_FMT_DATE
+					v.Print = sav.SPSS_FMT_DATE
 					v.Width = 11
 					v.Decimals = 0
-					v.Measure = SPSS_MLVL_RAT
+					v.Measure = sav.SPSS_MLVL_RAT
 				case "datetime":
-					v.Print = SPSS_FMT_DATE_TIME
+					v.Print = sav.SPSS_FMT_DATE_TIME
 					v.Width = 20
 					v.Decimals = 0
-					v.Measure = SPSS_MLVL_RAT
+					v.Measure = sav.SPSS_MLVL_RAT
 				default: // string
 					width := defaultStringLength
 					if hasAttr(&t, "width") {
@@ -149,7 +151,7 @@ func parseXSav(in io.Reader, basename string, lengths VarLengths) error {
 						}
 					}
 					v.Type = int32(width)
-					v.Print = SPSS_FMT_A
+					v.Print = sav.SPSS_FMT_A
 					v.Width = byte(width)
 					if width > 40 {
 						v.Width = 40
@@ -162,17 +164,17 @@ func parseXSav(in io.Reader, basename string, lengths VarLengths) error {
 				if hasAttr(&t, "measure") {
 					switch varxml.Measure {
 					case "scale":
-						v.Measure = SPSS_MLVL_RAT
+						v.Measure = sav.SPSS_MLVL_RAT
 					case "nominal":
-						v.Measure = SPSS_MLVL_NOM
+						v.Measure = sav.SPSS_MLVL_NOM
 					case "ordinal":
-						v.Measure = SPSS_MLVL_ORD
+						v.Measure = sav.SPSS_MLVL_ORD
 					default:
 						return fmt.Errorf("Unknown value for measure %s", varxml.Measure)
 					}
 				}
 				for _, l := range varxml.Labels {
-					v.Labels = append(v.Labels, Label{l.Value, l.Desc})
+					v.Labels = append(v.Labels, sav.Label{Value: l.Value, Desc: l.Desc})
 				}
 				out.AddVar(v)
 			case "case":

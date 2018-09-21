@@ -17,7 +17,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with xml2sav.  If not, see <http://www.gnu.org/licenses/>.
 */
-package main
+package sav
 
 import (
 	"bufio"
@@ -32,6 +32,9 @@ import (
 	"strings"
 	"time"
 )
+
+const maxStringLength = 1024 * 50
+const maxPrintStringWidth = 40
 
 const TimeOffset = 12219379200
 
@@ -87,14 +90,15 @@ func (v *Var) SegmentWidth(index int) int32 {
 var endian = binary.LittleEndian
 
 type SpssWriter struct {
-	*bufio.Writer                 // Buffered writer
-	seeker        io.WriteSeeker  // Original writer
-	bytecode      *BytecodeWriter // Special writer for compressed cases
-	Dict          []*Var          // Variables
-	DictMap       map[string]*Var // Long variable names index
-	ShortMap      map[string]*Var // Short variable names index
-	Count         int32           // Number of cases
-	Index         int32
+	*bufio.Writer                    // Buffered writer
+	seeker           io.WriteSeeker  // Original writer
+	bytecode         *BytecodeWriter // Special writer for compressed cases
+	Dict             []*Var          // Variables
+	DictMap          map[string]*Var // Long variable names index
+	ShortMap         map[string]*Var // Short variable names index
+	Count            int32           // Number of cases
+	Index            int32
+	IgnoreMissingVar bool
 }
 
 func NewSpssWriter(w io.WriteSeeker) *SpssWriter {
@@ -548,7 +552,7 @@ func (out *SpssWriter) ClearCase() {
 func (out *SpssWriter) SetVar(name, value string) {
 	v, found := out.DictMap[name]
 	if !found {
-		if ignoreMissingVar {
+		if out.IgnoreMissingVar {
 			return
 		}
 		log.Fatalln("Can not find the variable named in dictionary", name)
