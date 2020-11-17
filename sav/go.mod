@@ -1,1 +1,1 @@
-module bitbucket.org/bergenquete/xml2sav/sav
+module github.com/librun/xml2sav/sav
