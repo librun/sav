@@ -29,7 +29,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"bitbucket.org/bergenquete/xml2sav/sav"
+	"github.com/librun/xml2sav/sav"
 )
 
 type labelXML struct {

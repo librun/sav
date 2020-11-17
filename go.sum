@@ -1,4 +1,2 @@
-bitbucket.org/bergenquete/xml2sav/sav v1.0.0 h1:aFZ2KjdhQnNz+ECbqTck89HPnBYM13M+yjjKBy+IQ7Q=
-bitbucket.org/bergenquete/xml2sav/sav v1.0.0/go.mod h1:3VXPB2meR83qA1I/6Lc3DtfAB8nI67Sz2K0e8oqVqjI=
 golang.org/x/sys v0.0.0-20181221143128-b4a75ba826a6 h1:IcgEB62HYgAhX0Nd/QrVgZlxlcyxbGQHElLUhW2X4Fo=
 golang.org/x/sys v0.0.0-20181221143128-b4a75ba826a6/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
