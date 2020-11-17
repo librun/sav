@@ -484,7 +484,7 @@ func (out *SpssWriter) terminationRecord() {
 	binary.Write(out, endian, int32(0))   // filler
 }
 
-var shortNameRegExp = regexp.MustCompile(`^(.*?)(\d*)$`)
+var shortNameRegExp = regexp.MustCompile(`^(.*?|)(\d*)$`)
 
 func (out *SpssWriter) makeShortName(v *Var) string {
 	short := strings.ToUpper(v.Name)
@@ -499,10 +499,10 @@ func (out *SpssWriter) makeShortName(v *Var) string {
 		parts := shortNameRegExp.FindStringSubmatch(short)
 		if parts == nil || parts[2] == "" {
 			l := len(short)
-			if l > 7 {
-				l = 7
+			if l > 6 {
+				l = 6
 			}
-			short = short[:l] + "2"
+			short = short[:l] + "|2"
 		} else {
 			count, _ := strconv.Atoi(parts[2])
 			count++
