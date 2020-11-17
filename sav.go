@@ -484,7 +484,7 @@ func (out *SpssWriter) terminationRecord() {
 	binary.Write(out, endian, int32(0))   // filler
 }
 
-var shortNameRegExp = regexp.MustCompile(`^([^\d]*)(\d*)$`)
+var shortNameRegExp = regexp.MustCompile(`^(.*?)(\d*)$`)
 
 func (out *SpssWriter) makeShortName(v *Var) string {
 	short := strings.ToUpper(v.Name)
