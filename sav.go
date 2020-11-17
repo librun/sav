@@ -65,7 +65,6 @@ const (
 	DictTypeDate
 	DictTypeDatetime
 	DictTypeString
-	DictTypeLongString
 )
 
 type Var struct {
@@ -207,7 +206,7 @@ func (out *SpssWriter) VarCount() int32 {
 func (out *SpssWriter) writeString(v *Var, val string) error {
 	for s := 0; s < v.Segments; s++ {
 		var p string
-		if len(val) > 255 && v.Type != DictTypeLongString {
+		if len(val) > 255 {
 			p = val[:255]
 			val = val[255:]
 		} else {
@@ -502,19 +501,19 @@ func (out *SpssWriter) makeShortName(v *Var) string {
 			if l > 6 {
 				l = 6
 			}
-			short = short[:l] + "|2"
+			short = short[:l] + "|0"
 		} else {
 			count, _ := strconv.Atoi(parts[2])
 			count++
 			num := strconv.Itoa(count)
 			l := len(parts[1])
-			if l > 8-len(num) {
-				l = 8 - len(num)
+			if l > 7-len(num) {
+				l = 7 - len(num)
 			}
 			if l == 0 { // Come up with random name
 				short = "@" + strconv.Itoa(rand.Int()%10000000)
 			} else {
-				short = parts[1][:l] + num
+				short = parts[1][:l] + "|" + num
 			}
 		}
 	}
@@ -540,7 +539,7 @@ func (out *SpssWriter) AddVar(v *Var) {
 	}
 
 	v.Segments = 1
-	if v.TypeSize > 255 && v.Type != DictTypeLongString {
+	if v.TypeSize > 255 {
 		v.Segments = (int(v.TypeSize) + 251) / 252
 	}
 
