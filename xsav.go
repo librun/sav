@@ -114,7 +114,7 @@ func parseXSav(in io.Reader, basename string, lengths VarLengths) error {
 
 				v := new(Var)
 				v.Name = varxml.Name
-				v.Type = SPSS_NUMERIC
+				v.TypeSize = SPSS_NUMERIC
 				v.Measure = SPSS_MLVL_NOM
 				switch varxml.Type {
 				case "numeric":
@@ -148,7 +148,7 @@ func parseXSav(in io.Reader, basename string, lengths VarLengths) error {
 							return err
 						}
 					}
-					v.Type = int32(width)
+					v.TypeSize = int32(width)
 					v.Print = SPSS_FMT_A
 					v.Width = byte(width)
 					if width > 40 {

@@ -58,11 +58,22 @@ type Label struct {
 	Desc  string
 }
 
+type DictType int
+
+const (
+	DictTypeNumeric DictType = iota
+	DictTypeDate
+	DictTypeDatetime
+	DictTypeString
+	DictTypeLongString
+)
+
 type Var struct {
 	Index      int32
 	Name       string
 	ShortName  string
-	Type       int32
+	Type       DictType
+	TypeSize   int32
 	Print      byte
 	Width      byte
 	Decimals   byte
@@ -78,13 +89,13 @@ type Var struct {
 
 // SegmentWidth returns the width of the given segment
 func (v *Var) SegmentWidth(index int) int32 {
-	if v.Type <= 255 {
-		return v.Type
+	if v.TypeSize <= 255 {
+		return v.TypeSize
 	}
 	if index < v.Segments-1 {
 		return 255
 	}
-	return v.Type - int32(v.Segments-1)*252
+	return v.TypeSize - int32(v.Segments-1)*252
 }
 
 var endian = binary.LittleEndian
@@ -196,7 +207,7 @@ func (out *SpssWriter) VarCount() int32 {
 func (out *SpssWriter) writeString(v *Var, val string) error {
 	for s := 0; s < v.Segments; s++ {
 		var p string
-		if len(val) > 255 {
+		if len(val) > 255 && v.Type != DictTypeLongString {
 			p = val[:255]
 			val = val[255:]
 		} else {
@@ -250,7 +261,7 @@ func (out *SpssWriter) variableRecords() {
 			}
 			binary.Write(out, endian, int32(0)) // n_missing_values
 			var format int32
-			if v.Type > 0 { // string
+			if v.TypeSize > 0 { // string
 				format = int32(v.Print)<<16 | int32(width)<<8
 			} else { // number
 				format = int32(v.Print)<<16 | int32(v.Width)<<8 | int32(v.Decimals)
@@ -293,11 +304,11 @@ func (out *SpssWriter) variableRecords() {
 
 func (out *SpssWriter) valueLabelRecords() {
 	for _, v := range out.Dict {
-		if len(v.Labels) > 0 && v.Type <= 8 {
+		if len(v.Labels) > 0 && v.TypeSize <= 8 {
 			binary.Write(out, endian, int32(3))             // rec_type
 			binary.Write(out, endian, int32(len(v.Labels))) // label_count
 			for _, label := range v.Labels {
-				if v.Type == 0 {
+				if v.TypeSize == 0 {
 					binary.Write(out, endian, atof(label.Value)) // value
 				} else {
 					binary.Write(out, endian, stob(label.Value, 8)) // value
@@ -357,11 +368,11 @@ func (out *SpssWriter) variableDisplayParameterRecord() {
 	for _, v := range out.Dict {
 		for s := 0; s < v.Segments; s++ {
 			binary.Write(out, endian, v.Measure) // measure
-			if v.Type > 0 {
+			if v.TypeSize > 0 {
 				if s != 0 {
 					binary.Write(out, endian, int32(8)) // width
-				} else if v.Type <= int32(maxPrintStringWidth) {
-					binary.Write(out, endian, v.Type) // width
+				} else if v.TypeSize <= int32(maxPrintStringWidth) {
+					binary.Write(out, endian, v.TypeSize) // width
 				} else {
 					binary.Write(out, endian, int32(maxPrintStringWidth)) // width
 				}
@@ -415,7 +426,7 @@ func (out *SpssWriter) veryLongStringRecord() {
 		if v.Segments > 1 {
 			buf.Write([]byte(v.ShortName))
 			buf.Write([]byte("="))
-			buf.Write(stobp(strconv.Itoa(int(v.Type)), 5, 0))
+			buf.Write(stobp(strconv.Itoa(int(v.TypeSize)), 5, 0))
 			buf.Write([]byte{0, 9})
 		}
 	}
@@ -435,7 +446,7 @@ func (out *SpssWriter) longStringValueLabelsRecord() {
 	// Check if we have any
 	any := false
 	for _, v := range out.Dict {
-		if len(v.Labels) > 0 && v.Type > 8 {
+		if len(v.Labels) > 0 && v.TypeSize > 8 {
 			any = true
 			break
 		}
@@ -447,10 +458,10 @@ func (out *SpssWriter) longStringValueLabelsRecord() {
 	// Create record
 	buf := new(bytes.Buffer)
 	for _, v := range out.Dict {
-		if len(v.Labels) > 0 && v.Type > 8 {
+		if len(v.Labels) > 0 && v.TypeSize > 8 {
 			binary.Write(buf, endian, int32(len(v.ShortName))) // var_name_len
 			buf.Write([]byte(v.ShortName))                     // var_name
-			binary.Write(buf, endian, v.Type)                  // var_width
+			binary.Write(buf, endian, v.TypeSize)              // var_width
 			binary.Write(buf, endian, int32(len(v.Labels)))    // n_labels
 			for _, l := range v.Labels {
 				binary.Write(buf, endian, int32(len(l.Value))) // value_len
@@ -512,8 +523,8 @@ func (out *SpssWriter) makeShortName(v *Var) string {
 }
 
 func (out *SpssWriter) AddVar(v *Var) {
-	if v.Type > int32(maxStringLength) {
-		log.Fatalln("Maximum length for a variable is %d,", maxStringLength, v.Name, "is", v.Type)
+	if v.TypeSize > int32(maxStringLength) {
+		log.Fatalln("Maximum length for a variable is %d,", maxStringLength, v.Name, "is", v.TypeSize)
 	}
 
 	// Clean variable name
@@ -529,8 +540,8 @@ func (out *SpssWriter) AddVar(v *Var) {
 	}
 
 	v.Segments = 1
-	if v.Type > 255 {
-		v.Segments = (int(v.Type) + 251) / 252
+	if v.TypeSize > 255 && v.Type != DictTypeLongString {
+		v.Segments = (int(v.TypeSize) + 251) / 252
 	}
 
 	v.Index = out.Index
@@ -571,9 +582,9 @@ func (out *SpssWriter) WriteCase() {
 				val = v.Default
 			}
 
-			if v.Type > 0 { // string
-				if len(val) > int(v.Type) {
-					val = val[:v.Type]
+			if v.TypeSize > 0 { // string
+				if len(val) > int(v.TypeSize) {
+					val = val[:v.TypeSize]
 					log.Printf("Truncated string for %s: %s\n", v.Name, val)
 				}
 				out.writeString(v, val)
@@ -615,7 +626,7 @@ func (out *SpssWriter) WriteCase() {
 				}
 			}
 		} else { // Write missing value
-			if v.Type > 0 {
+			if v.TypeSize > 0 {
 				out.writeString(v, "")
 			} else {
 				out.bytecode.WriteMissing()
