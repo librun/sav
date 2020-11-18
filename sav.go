@@ -483,7 +483,7 @@ func (out *SpssWriter) terminationRecord() {
 	binary.Write(out, endian, int32(0))   // filler
 }
 
-var shortNameRegExp = regexp.MustCompile(`^(.*?\|)(\d*)$`)
+var shortNameRegExp = regexp.MustCompile(`^(.*?_)(\d*)$`)
 
 func (out *SpssWriter) makeShortName(v *Var) string {
 	short := strings.ToUpper(v.Name)
@@ -501,7 +501,7 @@ func (out *SpssWriter) makeShortName(v *Var) string {
 			if l > 6 {
 				l = 6
 			}
-			short = short[:l] + "|0"
+			short = short[:l] + "_0"
 		} else {
 			count, _ := strconv.Atoi(parts[2])
 			count++
@@ -513,7 +513,7 @@ func (out *SpssWriter) makeShortName(v *Var) string {
 			if l == 0 { // Come up with random name
 				short = "@" + strconv.Itoa(rand.Int()%10000000)
 			} else {
-				short = parts[1][:l] + "|" + num
+				short = parts[1][:l] + "_" + num
 			}
 		}
 	}
