@@ -38,6 +38,8 @@ import (
 const maxStringLength = 1024 * 50
 const maxPrintStringWidth = 40
 
+const defaultStringLength = 2048
+
 const TimeOffset = 12219379200
 
 const SPSS_NUMERIC = 0
