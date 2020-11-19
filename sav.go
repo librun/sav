@@ -31,6 +31,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	eci "github.com/librun/excel-column-iterator"
 )
 
 const maxStringLength = 1024 * 50
@@ -483,10 +485,10 @@ func (out *SpssWriter) terminationRecord() {
 	binary.Write(out, endian, int32(0))   // filler
 }
 
-var shortNameRegExp = regexp.MustCompile(`^(.*?_)(\d*)$`)
+var shortNameRegExp = regexp.MustCompile(`^(\w*?)(\d*)$`)
 
 func (out *SpssWriter) makeShortName(v *Var) string {
-	short := strings.ToUpper(v.Name)
+	short := eci.ConvertIntToString(int(v.Index))
 	if len(short) > 8 {
 		short = short[:8]
 	}
@@ -498,22 +500,22 @@ func (out *SpssWriter) makeShortName(v *Var) string {
 		parts := shortNameRegExp.FindStringSubmatch(short)
 		if parts == nil || parts[2] == "" {
 			l := len(short)
-			if l > 6 {
-				l = 6
+			if l > 7 {
+				l = 7
 			}
-			short = short[:l] + "_0"
+			short = short[:l] + "1"
 		} else {
 			count, _ := strconv.Atoi(parts[2])
 			count++
 			num := strconv.Itoa(count)
 			l := len(parts[1])
-			if l > 7-len(num) {
-				l = 7 - len(num)
+			if l > 8-len(num) {
+				l = 8 - len(num)
 			}
 			if l == 0 { // Come up with random name
 				short = "@" + strconv.Itoa(rand.Int()%10000000)
 			} else {
-				short = parts[1][:l] + "_" + num
+				short = parts[1][:l] + num
 			}
 		}
 	}
