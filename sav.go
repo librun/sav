@@ -72,22 +72,23 @@ const (
 )
 
 type Var struct {
-	Index      int32
-	Name       string
-	ShortName  string
-	Type       DictType
-	TypeSize   int32
-	Print      byte
-	Width      byte
-	Decimals   byte
-	Measure    int32
-	Label      string
-	Default    string
-	HasDefault bool
-	Labels     []Label
-	Value      string
-	HasValue   bool
-	Segments   int // how many segments
+	ColumnIndex int32
+	Index       int32
+	Name        string
+	ShortName   string
+	Type        DictType
+	TypeSize    int32
+	Print       byte
+	Width       byte
+	Decimals    byte
+	Measure     int32
+	Label       string
+	Default     string
+	HasDefault  bool
+	Labels      []Label
+	Value       string
+	HasValue    bool
+	Segments    int // how many segments
 }
 
 // SegmentWidth returns the width of the given segment
@@ -112,6 +113,7 @@ type SpssWriter struct {
 	ShortMap         map[string]*Var // Short variable names index
 	Count            int32           // Number of cases
 	Index            int32
+	ColumnIndex      int32
 	IgnoreMissingVar bool
 }
 
@@ -150,10 +152,6 @@ func trim(s string, l int) string {
 		return s[:l]
 	}
 	return s
-}
-
-func ftoa(f float64) string {
-	return strconv.FormatFloat(f, 'E', -1, 64)
 }
 
 func atof(s string) float64 {
@@ -490,10 +488,9 @@ func (out *SpssWriter) terminationRecord() {
 var shortNameRegExp = regexp.MustCompile(`^(\w*?)(\d*)$`)
 
 func (out *SpssWriter) makeShortName(v *Var) string {
-	short := eci.ConvertIntToString(int(v.Index))
-	if len(short) > 8 {
-		short = short[:8]
-	}
+	short := trim(eci.ConvertIntToString(int(v.ColumnIndex)), 7)
+	short = short + "1"
+
 	for {
 		_, found := out.ShortMap[short]
 		if !found {
@@ -501,11 +498,7 @@ func (out *SpssWriter) makeShortName(v *Var) string {
 		}
 		parts := shortNameRegExp.FindStringSubmatch(short)
 		if parts == nil || parts[2] == "" {
-			l := len(short)
-			if l > 7 {
-				l = 7
-			}
-			short = short[:l] + "1"
+			short = trim(short, 7) + "2"
 		} else {
 			count, _ := strconv.Atoi(parts[2])
 			count++
@@ -527,7 +520,7 @@ func (out *SpssWriter) makeShortName(v *Var) string {
 
 func (out *SpssWriter) AddVar(v *Var) {
 	if v.TypeSize > int32(maxStringLength) {
-		log.Fatalln("Maximum length for a variable is %d,", maxStringLength, v.Name, "is", v.TypeSize)
+		log.Fatalf("maximum length for a variable is %d, %s is %d", maxStringLength, v.Name, v.TypeSize)
 	}
 
 	// Clean variable name
@@ -551,6 +544,8 @@ func (out *SpssWriter) AddVar(v *Var) {
 	for i := 0; i < v.Segments; i++ {
 		out.Index += elementCount(v.SegmentWidth(i))
 	}
+	out.ColumnIndex++
+	v.ColumnIndex = out.ColumnIndex
 
 	out.Dict = append(out.Dict, v)
 	out.DictMap[origName] = v
