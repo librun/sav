@@ -31,8 +31,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	eci "github.com/librun/excel-column-iterator"
 )
 
 const maxStringLength = 1024 * 50
@@ -154,6 +152,80 @@ func trim(s string, l int) string {
 	return s
 }
 
+func ConvertIntToColumnName(s int) (result string) {
+	for {
+		denom := s % 36
+		result = getAlpabetByInt(denom) + result
+
+		if s/36 >= 1 {
+			s = (s - denom) / 36
+		} else {
+			break
+		}
+	}
+
+	return result
+}
+
+func getAlpabetByInt(s int) string {
+	switch s {
+	case 10:
+		return "a"
+	case 11:
+		return "b"
+	case 12:
+		return "c"
+	case 13:
+		return "d"
+	case 14:
+		return "e"
+	case 15:
+		return "f"
+	case 16:
+		return "g"
+	case 17:
+		return "h"
+	case 18:
+		return "i"
+	case 19:
+		return "j"
+	case 20:
+		return "k"
+	case 21:
+		return "l"
+	case 22:
+		return "m"
+	case 23:
+		return "n"
+	case 24:
+		return "o"
+	case 25:
+		return "p"
+	case 26:
+		return "q"
+	case 27:
+		return "r"
+	case 28:
+		return "s"
+	case 29:
+		return "t"
+	case 30:
+		return "u"
+	case 31:
+		return "v"
+	case 32:
+		return "w"
+	case 33:
+		return "x"
+	case 34:
+		return "y"
+	case 35:
+		return "z"
+	default:
+		return strconv.Itoa(s)
+	}
+}
+
 func atof(s string) float64 {
 	v, err := strconv.ParseFloat(s, 32)
 	if err != nil {
@@ -270,7 +342,7 @@ func (out *SpssWriter) variableRecords() {
 			binary.Write(out, endian, format) // print
 			binary.Write(out, endian, format) // write
 			if segment == 0 {                 // first var
-				v.ShortName = out.makeShortName(v)
+				v.ShortName = out.makeShortName(v, segment)
 				out.Write(stob(v.ShortName, 8)) // name
 				if len(v.Label) > 0 {
 					binary.Write(out, endian, int32(len(v.Label))) // label_len
@@ -284,7 +356,7 @@ func (out *SpssWriter) variableRecords() {
 					}
 				}
 			} else { // segment > 0
-				out.Write(stob(out.makeShortName(v), 8)) // name (a fresh new one)
+				out.Write(stob(out.makeShortName(v, segment), 8)) // name (a fresh new one)
 			}
 
 			if width > 8 { // handle long string
@@ -485,36 +557,27 @@ func (out *SpssWriter) terminationRecord() {
 	binary.Write(out, endian, int32(0))   // filler
 }
 
-var shortNameRegExp = regexp.MustCompile(`^(\w*?)(\d*)$`)
-
-func (out *SpssWriter) makeShortName(v *Var) string {
-	short := trim(eci.ConvertIntToString(int(v.ColumnIndex)), 7)
-	short = short + "1"
+func (out *SpssWriter) makeShortName(v *Var, segment int) string {
+	baseName := strings.ToUpper(trim(v.Name, 5))
+	short := baseName + "0"
 
 	for {
 		_, found := out.ShortMap[short]
 		if !found {
 			break
 		}
-		parts := shortNameRegExp.FindStringSubmatch(short)
-		if parts == nil || parts[2] == "" {
-			short = trim(short, 7) + "2"
+
+		appendText := strings.ToUpper(ConvertIntToColumnName(segment))
+		segment++
+
+		if len(appendText) > 3 { // Come up with random name
+			short = "@" + strconv.Itoa(rand.Int()%10000000)
 		} else {
-			count, _ := strconv.Atoi(parts[2])
-			count++
-			num := strconv.Itoa(count)
-			l := len(parts[1])
-			if l > 8-len(num) {
-				l = 8 - len(num)
-			}
-			if l == 0 { // Come up with random name
-				short = "@" + strconv.Itoa(rand.Int()%10000000)
-			} else {
-				short = parts[1][:l] + num
-			}
+			short = baseName + appendText
 		}
 	}
 	out.ShortMap[short] = v
+
 	return short
 }
 
