@@ -44,7 +44,9 @@ func GenerateNativeSav(filePath string, dict []Dict, cases [][]Val) error {
 	}
 
 	for i := range cases {
-		out.WriteVal(cases[i])
+		if err := out.WriteVal(cases[i]); err != nil {
+			return err
+		}
 	}
 
 	return out.Close()
@@ -70,7 +72,9 @@ func NewNativeSav(filePath string, dict []Dict) (*NativeSav, error) {
 }
 
 func (nv *NativeSav) Close() error {
-	nv.out.Finish()
+	if err := nv.out.Finish(); err != nil {
+		return err
+	}
 
 	return nv.file.Close()
 }
@@ -106,7 +110,7 @@ func (nv *NativeSav) WriteDict() (err error) {
 			v.Decimals = 0
 			v.Measure = SPSS_MLVL_RAT
 		default: // string
-			width := defaultStringLength
+			var width int
 			if d.Width != nil {
 				width = *d.Width
 			} else {
@@ -147,17 +151,16 @@ func (nv *NativeSav) WriteDict() (err error) {
 		nv.out.AddVar(v)
 	}
 
-	nv.out.Start(fmt.Sprintf("start write value: %s", nv.basename))
-
-	return nil
+	return nv.out.Start(fmt.Sprintf("start write value: %s", nv.basename))
 }
 
-func (nv *NativeSav) WriteVal(vals []Val) {
+func (nv *NativeSav) WriteVal(vals []Val) error {
 	nv.out.ClearCase()
 	for _, val := range vals {
 		nv.out.SetVar(val.Name, val.Value)
 	}
-	nv.out.WriteCase()
+
+	return nv.out.WriteCase()
 }
 
 func (nv *NativeSav) findLengths(cases [][]Val) {

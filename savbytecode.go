@@ -68,7 +68,11 @@ func (w *BytecodeWriter) WriteNumber(number float64) error {
 	}
 	w.command[w.index] = 253
 	w.index++
-	binary.Write(&w.data, endian, number)
+
+	if err := binary.Write(&w.data, endian, number); err != nil {
+		return err
+	}
+
 	return w.checkAndWrite()
 }
 

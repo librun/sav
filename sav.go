@@ -33,23 +33,17 @@ import (
 	"time"
 )
 
-const maxStringLength = 1024 * 50
-const maxPrintStringWidth = 40
-
-const defaultStringLength = 2048
-
-const TimeOffset = 12219379200
-
-const SPSS_NUMERIC = 0
-
 const (
+	maxStringLength     = 1024 * 50
+	maxPrintStringWidth = 40
+	TimeOffset          = 12219379200
+	SPSS_NUMERIC        = 0
+
 	SPSS_FMT_A         = 1
 	SPSS_FMT_F         = 5
 	SPSS_FMT_DATE      = 20
 	SPSS_FMT_DATE_TIME = 22
-)
 
-const (
 	SPSS_MLVL_NOM = 1
 	SPSS_MLVL_ORD = 2
 	SPSS_MLVL_RAT = 3
@@ -296,187 +290,424 @@ func (out *SpssWriter) writeString(v *Var, val string) error {
 	return nil
 }
 
-func (out *SpssWriter) headerRecord(fileLabel string) {
+func (out *SpssWriter) headerRecord(fileLabel string) error {
 	c := time.Now()
-	out.Write(stob("$FL2", 4))                               // rec_tyoe
-	out.Write(stob("@(#) SPSS DATA FILE - xml2sav 2.0", 60)) // prod_name
-	binary.Write(out, endian, int32(2))                      // layout_code
-	binary.Write(out, endian, out.caseSize())                // nominal_case_size
-	binary.Write(out, endian, int32(1))                      // compression
-	binary.Write(out, endian, int32(0))                      // weight_index
-	binary.Write(out, endian, int32(-1))                     // ncases
-	binary.Write(out, endian, float64(100))                  // bias
-	out.Write(stob(c.Format("02 Jan 06"), 9))                // creation_date
-	out.Write(stob(c.Format("15:04:05"), 8))                 // creation_time
-	out.Write(stob(fileLabel, 64))                           // file_label
-	out.Write(stob("\x00\x00\x00", 3))                       // padding
+
+	if _, err := out.Write(stob("$FL2", 4)); err != nil { // rec_tyoe
+		return err
+	}
+
+	if _, err := out.Write(stob("@(#) SPSS DATA FILE - xml2sav 2.0", 60)); err != nil { // prod_name
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(2)); err != nil { // layout_code
+		return err
+	}
+
+	if err := binary.Write(out, endian, out.caseSize()); err != nil { // nominal_case_size
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(1)); err != nil { // compression
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(0)); err != nil { // weight_index
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(-1)); err != nil { // ncases
+		return err
+	}
+
+	if err := binary.Write(out, endian, float64(100)); err != nil { // bias
+		return err
+	}
+
+	if _, err := out.Write(stob(c.Format("02 Jan 06"), 9)); err != nil { // creation_date
+		return err
+	}
+
+	if _, err := out.Write(stob(c.Format("15:04:05"), 8)); err != nil { // creation_time
+		return err
+	}
+
+	if _, err := out.Write(stob(fileLabel, 64)); err != nil { // file_label
+		return err
+	}
+
+	if _, err := out.Write(stob("\x00\x00\x00", 3)); err != nil { // padding
+		return err
+	}
+
+	return nil
 }
 
 // If you use a buffer, supply it as the flusher argument
 // After this close the file
-func (out *SpssWriter) updateHeaderNCases() {
+func (out *SpssWriter) updateHeaderNCases() error {
 	out.bytecode.Flush()
 	out.Flush()
-	out.Seek(80, 0)
-	binary.Write(out.seeker, endian, out.Count) // ncases in headerRecord
+	if _, err := out.Seek(80, 0); err != nil {
+		return err
+	}
+
+	return binary.Write(out.seeker, endian, out.Count) // ncases in headerRecord
 }
 
-func (out *SpssWriter) variableRecords() {
+func (out *SpssWriter) variableRecords() error {
 	for _, v := range out.Dict {
 		for segment := 0; segment < v.Segments; segment++ {
 			width := v.SegmentWidth(segment)
-			binary.Write(out, endian, int32(2)) // rec_type
-			binary.Write(out, endian, width)    // type (0 or strlen)
-			if segment == 0 && len(v.Label) > 0 {
-				binary.Write(out, endian, int32(1)) // has_var_label
-			} else {
-				binary.Write(out, endian, int32(0)) // has_var_label
+			if err := binary.Write(out, endian, int32(2)); err != nil { // rec_type
+				return err
 			}
-			binary.Write(out, endian, int32(0)) // n_missing_values
+
+			if err := binary.Write(out, endian, width); err != nil { // type (0 or strlen)
+				return err
+			}
+			if segment == 0 && len(v.Label) > 0 {
+				if err := binary.Write(out, endian, int32(1)); err != nil { // has_var_label
+					return err
+				}
+			} else {
+				if err := binary.Write(out, endian, int32(0)); err != nil { // has_var_label
+					return err
+				}
+			}
+			if err := binary.Write(out, endian, int32(0)); err != nil { // n_missing_values
+				return err
+			}
+
 			var format int32
 			if v.TypeSize > 0 { // string
 				format = int32(v.Print)<<16 | int32(width)<<8
 			} else { // number
 				format = int32(v.Print)<<16 | int32(v.Width)<<8 | int32(v.Decimals)
 			}
-			binary.Write(out, endian, format) // print
-			binary.Write(out, endian, format) // write
-			if segment == 0 {                 // first var
+			if err := binary.Write(out, endian, format); err != nil { // print
+				return err
+			}
+
+			if err := binary.Write(out, endian, format); err != nil { // write
+				return err
+			}
+
+			if segment == 0 { // first var
 				v.ShortName = out.makeShortName(v, segment)
-				out.Write(stob(v.ShortName, 8)) // name
+				if _, err := out.Write(stob(v.ShortName, 8)); err != nil { // name
+					return err
+				}
+
 				if len(v.Label) > 0 {
-					binary.Write(out, endian, int32(len(v.Label))) // label_len
-					out.Write([]byte(v.Label))                     // label
+					if err := binary.Write(out, endian, int32(len(v.Label))); err != nil { // label_len
+						return err
+					}
+
+					if _, err := out.Write([]byte(v.Label)); err != nil { // label
+						return err
+					}
+
 					pad := (4 - len(v.Label)) % 4
 					if pad < 0 {
 						pad += 4
 					}
 					for i := 0; i < pad; i++ {
-						out.Write([]byte{0}) // pad out until multiple of 32 bit
+						if _, err := out.Write([]byte{0}); err != nil { // pad out until multiple of 32 bit
+							return err
+						}
 					}
 				}
 			} else { // segment > 0
-				out.Write(stob(out.makeShortName(v, segment), 8)) // name (a fresh new one)
+				if _, err := out.Write(stob(out.makeShortName(v, segment), 8)); err != nil { // name (a fresh new one)
+					return err
+				}
 			}
 
 			if width > 8 { // handle long string
 				count := int(elementCount(width) - 1) // number of extra vars to store string
 				for i := 0; i < count; i++ {
-					binary.Write(out, endian, int32(2))  // rec_type
-					binary.Write(out, endian, int32(-1)) // extended string part
-					binary.Write(out, endian, int32(0))  // has_var_label
-					binary.Write(out, endian, int32(0))  // n_missing_valuess
-					binary.Write(out, endian, int32(0))  // print
-					binary.Write(out, endian, int32(0))  // write
-					out.Write(stob("        ", 8))       // name
+					if err := binary.Write(out, endian, int32(2)); err != nil { // rec_type
+						return err
+					}
+
+					if err := binary.Write(out, endian, int32(-1)); err != nil { // extended string part
+						return err
+					}
+
+					if err := binary.Write(out, endian, int32(0)); err != nil { // has_var_label
+						return err
+					}
+
+					if err := binary.Write(out, endian, int32(0)); err != nil { // n_missing_valuess
+						return err
+					}
+
+					if err := binary.Write(out, endian, int32(0)); err != nil { // print
+						return err
+					}
+
+					if err := binary.Write(out, endian, int32(0)); err != nil { // write
+						return err
+					}
+
+					if _, err := out.Write(stob("        ", 8)); err != nil { // name
+						return err
+					}
 				}
 			}
 		}
 	}
+
+	return nil
 }
 
-func (out *SpssWriter) valueLabelRecords() {
+func (out *SpssWriter) valueLabelRecords() error {
 	for _, v := range out.Dict {
 		if len(v.Labels) > 0 && v.TypeSize <= 8 {
-			binary.Write(out, endian, int32(3))             // rec_type
-			binary.Write(out, endian, int32(len(v.Labels))) // label_count
+			if err := binary.Write(out, endian, int32(3)); err != nil { // rec_type
+				return err
+			}
+
+			if err := binary.Write(out, endian, int32(len(v.Labels))); err != nil { // label_count
+				return err
+			}
+
 			for _, label := range v.Labels {
 				if v.TypeSize == 0 {
-					binary.Write(out, endian, atof(label.Value)) // value
+					if err := binary.Write(out, endian, atof(label.Value)); err != nil { // value
+						return err
+					}
 				} else {
-					binary.Write(out, endian, stob(label.Value, 8)) // value
+					if err := binary.Write(out, endian, stob(label.Value, 8)); err != nil { // value
+						return err
+					}
 				}
 				l := len(label.Desc)
 				if l > 120 {
 					l = 120
 				}
-				binary.Write(out, endian, byte(l)) // label_len
-				out.Write(stob(label.Desc, l))     // label
+				if err := binary.Write(out, endian, byte(l)); err != nil { // label_len
+					return err
+				}
+
+				if _, err := out.Write(stob(label.Desc, l)); err != nil { // label
+					return err
+				}
+
 				pad := (8 - l - 1) % 8
 				if pad < 0 {
 					pad += 8
 				}
 				for i := 0; i < pad; i++ {
-					out.Write([]byte{32})
+					if _, err := out.Write([]byte{32}); err != nil {
+						return err
+					}
 				}
 			}
 
-			binary.Write(out, endian, int32(4))       // rec_type
-			binary.Write(out, endian, int32(1))       // var_count
-			binary.Write(out, endian, int32(v.Index)) // vars
+			if err := binary.Write(out, endian, int32(4)); err != nil { // rec_type
+				return err
+			}
+
+			if err := binary.Write(out, endian, int32(1)); err != nil { // var_count
+				return err
+			}
+
+			if err := binary.Write(out, endian, int32(v.Index)); err != nil { // vars
+				return err
+			}
 		}
 	}
+
+	return nil
 }
 
-func (out *SpssWriter) machineIntegerInfoRecord() {
-	binary.Write(out, endian, int32(7))     // rec_type
-	binary.Write(out, endian, int32(3))     // subtype
-	binary.Write(out, endian, int32(4))     // size
-	binary.Write(out, endian, int32(8))     // count
-	binary.Write(out, endian, int32(0))     // version_major
-	binary.Write(out, endian, int32(10))    // version_minor
-	binary.Write(out, endian, int32(1))     // version_revision
-	binary.Write(out, endian, int32(-1))    // machine_code
-	binary.Write(out, endian, int32(1))     // floating_point_rep
-	binary.Write(out, endian, int32(1))     // compression_code
-	binary.Write(out, endian, int32(2))     // endianness
-	binary.Write(out, endian, int32(65001)) // character_code
+func (out *SpssWriter) machineIntegerInfoRecord() error {
+	if err := binary.Write(out, endian, int32(7)); err != nil { // rec_type
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(3)); err != nil { // subtype
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(4)); err != nil { // size
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(8)); err != nil { // count
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(0)); err != nil { // version_major
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(10)); err != nil { // version_minor
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(1)); err != nil { // version_revision
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(-1)); err != nil { // machine_code
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(1)); err != nil { // floating_point_rep
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(1)); err != nil { // compression_code
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(2)); err != nil { // endianness
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(65001)); err != nil { // character_code
+		return err
+	}
+
+	return nil
 }
 
-func (out *SpssWriter) machineFloatingPointInfoRecord() {
-	binary.Write(out, endian, int32(7))                  // rec_type
-	binary.Write(out, endian, int32(4))                  // subtype
-	binary.Write(out, endian, int32(8))                  // size
-	binary.Write(out, endian, int32(3))                  // count
-	binary.Write(out, endian, float64(-math.MaxFloat64)) // sysmis
-	binary.Write(out, endian, float64(math.MaxFloat64))  // highest
-	binary.Write(out, endian, float64(-math.MaxFloat64)) // lowest
+func (out *SpssWriter) machineFloatingPointInfoRecord() error {
+	if err := binary.Write(out, endian, int32(7)); err != nil { // rec_type
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(4)); err != nil { // subtype
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(8)); err != nil { // size
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(3)); err != nil { // count
+		return err
+	}
+
+	if err := binary.Write(out, endian, float64(-math.MaxFloat64)); err != nil { // sysmis
+		return err
+	}
+
+	if err := binary.Write(out, endian, float64(math.MaxFloat64)); err != nil { // highest
+		return err
+	}
+
+	if err := binary.Write(out, endian, float64(-math.MaxFloat64)); err != nil { // lowest
+		return err
+	}
+
+	return nil
 }
 
-func (out *SpssWriter) variableDisplayParameterRecord() {
-	binary.Write(out, endian, int32(7))         // rec_type
-	binary.Write(out, endian, int32(11))        // subtype
-	binary.Write(out, endian, int32(4))         // size
-	binary.Write(out, endian, out.VarCount()*3) // count
+func (out *SpssWriter) variableDisplayParameterRecord() error {
+	if err := binary.Write(out, endian, int32(7)); err != nil { // rec_type
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(11)); err != nil { // subtype
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(4)); err != nil { // size
+		return err
+	}
+
+	if err := binary.Write(out, endian, out.VarCount()*3); err != nil { // count
+		return err
+	}
+
 	for _, v := range out.Dict {
 		for s := 0; s < v.Segments; s++ {
-			binary.Write(out, endian, v.Measure) // measure
+			if err := binary.Write(out, endian, v.Measure); err != nil { // measure
+				return err
+			}
+
 			if v.TypeSize > 0 {
 				if s != 0 {
-					binary.Write(out, endian, int32(8)) // width
+					if err := binary.Write(out, endian, int32(8)); err != nil { // width
+						return err
+					}
 				} else if v.TypeSize <= int32(maxPrintStringWidth) {
-					binary.Write(out, endian, v.TypeSize) // width
+					if err := binary.Write(out, endian, v.TypeSize); err != nil { // width
+						return err
+					}
 				} else {
-					binary.Write(out, endian, int32(maxPrintStringWidth)) // width
+					if err := binary.Write(out, endian, int32(maxPrintStringWidth)); err != nil { // width
+						return err
+					}
 				}
-				binary.Write(out, endian, int32(0)) // alignment (left)
+				if err := binary.Write(out, endian, int32(0)); err != nil { // alignment (left)
+					return err
+				}
 			} else {
-				binary.Write(out, endian, int32(8)) // width
-				binary.Write(out, endian, int32(1)) // alignment (right)
+				if err := binary.Write(out, endian, int32(8)); err != nil { // width
+					return err
+				}
+
+				if err := binary.Write(out, endian, int32(1)); err != nil { // alignment (right)
+					return err
+				}
 			}
 		}
 	}
+
+	return nil
 }
 
-func (out *SpssWriter) longVarNameRecords() {
-	binary.Write(out, endian, int32(7))  // rec_type
-	binary.Write(out, endian, int32(13)) // subtype
-	binary.Write(out, endian, int32(1))  // size
+func (out *SpssWriter) longVarNameRecords() error {
+	if err := binary.Write(out, endian, int32(7)); err != nil { // rec_type
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(13)); err != nil { // subtype
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(1)); err != nil { // size
+		return err
+	}
 
 	buf := bytes.Buffer{}
 	for i, v := range out.Dict {
-		buf.Write([]byte(v.ShortName))
-		buf.Write([]byte("="))
-		buf.Write([]byte(v.Name))
+		if _, err := buf.Write([]byte(v.ShortName)); err != nil {
+
+			return err
+		}
+
+		if _, err := buf.Write([]byte("=")); err != nil {
+			return err
+		}
+
+		if _, err := buf.Write([]byte(v.Name)); err != nil {
+			return err
+		}
+
 		if i < len(out.Dict)-1 {
-			buf.Write([]byte{9})
+			if _, err := buf.Write([]byte{9}); err != nil {
+				return err
+			}
 		}
 	}
-	binary.Write(out, endian, int32(buf.Len()))
-	out.Write(buf.Bytes())
+	if err := binary.Write(out, endian, int32(buf.Len())); err != nil {
+		return err
+	}
+	if _, err := out.Write(buf.Bytes()); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (out *SpssWriter) veryLongStringRecord() {
+func (out *SpssWriter) veryLongStringRecord() error {
 	b := false
 	for _, v := range out.Dict {
 		if v.Segments > 1 {
@@ -487,35 +718,78 @@ func (out *SpssWriter) veryLongStringRecord() {
 
 	if !b {
 		// There are no very long strings so don't write the record
-		return
+		return nil
 	}
 
-	binary.Write(out, endian, int32(7))  // rec_type
-	binary.Write(out, endian, int32(14)) // subtype
-	binary.Write(out, endian, int32(1))  // size
+	if err := binary.Write(out, endian, int32(7)); err != nil { // rec_type
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(14)); err != nil { // subtype
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(1)); err != nil { // size
+		return err
+	}
 
 	buf := bytes.Buffer{}
 	for _, v := range out.Dict {
 		if v.Segments > 1 {
-			buf.Write([]byte(v.ShortName))
-			buf.Write([]byte("="))
-			buf.Write(stobp(strconv.Itoa(int(v.TypeSize)), 5, 0))
-			buf.Write([]byte{0, 9})
+			if _, err := buf.Write([]byte(v.ShortName)); err != nil {
+				return err
+			}
+
+			if _, err := buf.Write([]byte("=")); err != nil {
+				return err
+			}
+
+			if _, err := buf.Write(stobp(strconv.Itoa(int(v.TypeSize)), 5, 0)); err != nil {
+				return err
+			}
+
+			if _, err := buf.Write([]byte{0, 9}); err != nil {
+				return err
+			}
 		}
 	}
-	binary.Write(out, endian, int32(buf.Len())) // count
-	out.Write(buf.Bytes())
+
+	if err := binary.Write(out, endian, int32(buf.Len())); err != nil { // count
+		return err
+	}
+
+	if _, err := out.Write(buf.Bytes()); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (out *SpssWriter) encodingRecord() {
-	binary.Write(out, endian, int32(7))  // rec_type
-	binary.Write(out, endian, int32(20)) // subtype
-	binary.Write(out, endian, int32(1))  // size
-	binary.Write(out, endian, int32(5))  // filler
-	out.Write(stob("UTF-8", 5))          // encoding
+func (out *SpssWriter) encodingRecord() error {
+	if err := binary.Write(out, endian, int32(7)); err != nil { // rec_type
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(20)); err != nil { // subtype
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(1)); err != nil { // size
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(5)); err != nil { // filler
+		return err
+	}
+
+	if _, err := out.Write(stob("UTF-8", 5)); err != nil { // encoding
+		return err
+	}
+
+	return nil
 }
 
-func (out *SpssWriter) longStringValueLabelsRecord() {
+func (out *SpssWriter) longStringValueLabelsRecord() error {
 	// Check if we have any
 	any := false
 	for _, v := range out.Dict {
@@ -525,36 +799,82 @@ func (out *SpssWriter) longStringValueLabelsRecord() {
 		}
 	}
 	if !any {
-		return
+		return nil
 	}
 
 	// Create record
 	buf := new(bytes.Buffer)
 	for _, v := range out.Dict {
 		if len(v.Labels) > 0 && v.TypeSize > 8 {
-			binary.Write(buf, endian, int32(len(v.ShortName))) // var_name_len
-			buf.Write([]byte(v.ShortName))                     // var_name
-			binary.Write(buf, endian, v.TypeSize)              // var_width
-			binary.Write(buf, endian, int32(len(v.Labels)))    // n_labels
+			if err := binary.Write(buf, endian, int32(len(v.ShortName))); err != nil { // var_name_len
+				return err
+			}
+
+			if _, err := buf.Write([]byte(v.ShortName)); err != nil { // var_name
+				return err
+			}
+
+			if err := binary.Write(buf, endian, v.TypeSize); err != nil { // var_width
+				return err
+			}
+
+			if err := binary.Write(buf, endian, int32(len(v.Labels))); err != nil { // n_labels
+				return err
+			}
+
 			for _, l := range v.Labels {
-				binary.Write(buf, endian, int32(len(l.Value))) // value_len
-				buf.Write([]byte(l.Value))                     // value
-				binary.Write(buf, endian, int32(len(l.Desc)))  // label_len
-				buf.Write([]byte(l.Desc))                      //label
+				if err := binary.Write(buf, endian, int32(len(l.Value))); err != nil { // value_len
+					return err
+				}
+
+				if _, err := buf.Write([]byte(l.Value)); err != nil { // value
+					return err
+				}
+
+				if err := binary.Write(buf, endian, int32(len(l.Desc))); err != nil { // label_len
+					return err
+				}
+
+				if _, err := buf.Write([]byte(l.Desc)); err != nil { //label
+					return err
+				}
 			}
 		}
 	}
 
-	binary.Write(out, endian, int32(7))         // rec_type
-	binary.Write(out, endian, int32(21))        // subtype
-	binary.Write(out, endian, int32(1))         // size
-	binary.Write(out, endian, int32(buf.Len())) // count
-	out.Write(buf.Bytes())
+	if err := binary.Write(out, endian, int32(7)); err != nil { // rec_type
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(21)); err != nil { // subtype
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(1)); err != nil { // size
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(buf.Len())); err != nil { // count
+		return err
+	}
+
+	if _, err := out.Write(buf.Bytes()); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (out *SpssWriter) terminationRecord() {
-	binary.Write(out, endian, int32(999)) // rec_type
-	binary.Write(out, endian, int32(0))   // filler
+func (out *SpssWriter) terminationRecord() error {
+	if err := binary.Write(out, endian, int32(999)); err != nil { // rec_type
+		return err
+	}
+
+	if err := binary.Write(out, endian, int32(0)); err != nil { // filler
+		return err
+	}
+
+	return nil
 }
 
 func (out *SpssWriter) makeShortName(v *Var, segment int) string {
@@ -633,7 +953,7 @@ func (out *SpssWriter) SetVar(name, value string) {
 	v.HasValue = true
 }
 
-func (out *SpssWriter) WriteCase() {
+func (out *SpssWriter) WriteCase() error {
 	for _, v := range out.Dict {
 		if v.HasValue || v.HasDefault {
 			var val string
@@ -648,69 +968,129 @@ func (out *SpssWriter) WriteCase() {
 					val = val[:v.TypeSize]
 					log.Printf("Truncated string for %s: %s\n", v.Name, val)
 				}
-				out.writeString(v, val)
+				if err := out.writeString(v, val); err != nil {
+					return err
+				}
 			} else if v.Print == SPSS_FMT_DATE {
 				if val == "" {
-					binary.Write(out, endian, -math.MaxFloat64) // Write missing
+					if err := binary.Write(out, endian, -math.MaxFloat64); err != nil { // Write missing
+						return err
+					}
 				} else {
 					t, err := time.Parse("2-Jan-2006", v.Value)
 					if err != nil {
 						log.Printf("Problem pasing value for %s: %s - set as missing\n", v.Name, err)
-						out.bytecode.WriteMissing()
+						if err := out.bytecode.WriteMissing(); err != nil {
+							return err
+						}
 					} else {
-						out.bytecode.WriteNumber(float64(t.Unix() + TimeOffset))
+						if err := out.bytecode.WriteNumber(float64(t.Unix() + TimeOffset)); err != nil {
+							return err
+						}
 					}
 				}
 			} else if v.Print == SPSS_FMT_DATE_TIME {
 				if val == "" {
-					out.bytecode.WriteMissing()
+					if err := out.bytecode.WriteMissing(); err != nil {
+						return err
+					}
 				} else {
 					t, err := time.Parse("2-Jan-2006 15:04:05", v.Value)
 					if err != nil {
 						log.Printf("Problem pasing value for %s: %s - set as missing\n", v.Name, err)
-						out.bytecode.WriteMissing()
+						if err := out.bytecode.WriteMissing(); err != nil {
+							return err
+						}
 					} else {
-						out.bytecode.WriteNumber(float64(t.Unix() + TimeOffset))
+						if err := out.bytecode.WriteNumber(float64(t.Unix() + TimeOffset)); err != nil {
+							return err
+						}
 					}
 				}
 			} else { // number
 				if val == "" {
-					out.bytecode.WriteMissing()
+					if err := out.bytecode.WriteMissing(); err != nil {
+						return err
+					}
 				} else {
 					f, err := strconv.ParseFloat(val, 64)
 					if err != nil {
 						log.Printf("Problem pasing value for %s: %s - set as missing\n", v.Name, err)
-						out.bytecode.WriteMissing()
+						if err := out.bytecode.WriteMissing(); err != nil {
+							return err
+						}
 					} else {
-						out.bytecode.WriteNumber(f)
+						if err := out.bytecode.WriteNumber(f); err != nil {
+							return err
+						}
 					}
 				}
 			}
 		} else { // Write missing value
 			if v.TypeSize > 0 {
-				out.writeString(v, "")
+				if err := out.writeString(v, ""); err != nil {
+					return err
+				}
 			} else {
-				out.bytecode.WriteMissing()
+				if err := out.bytecode.WriteMissing(); err != nil {
+					return err
+				}
 			}
 		}
 	}
 	out.Count++
+
+	return nil
 }
 
-func (out *SpssWriter) Start(fileLabel string) {
-	out.headerRecord(fileLabel)
-	out.variableRecords()
-	out.valueLabelRecords()
-	out.machineIntegerInfoRecord()
-	out.machineFloatingPointInfoRecord()
-	out.variableDisplayParameterRecord()
-	out.longVarNameRecords()
-	out.veryLongStringRecord()
-	out.encodingRecord()
-	out.longStringValueLabelsRecord()
-	out.terminationRecord()
+func (out *SpssWriter) Start(fileLabel string) error {
+	if err := out.headerRecord(fileLabel); err != nil {
+		return err
+	}
+
+	if err := out.variableRecords(); err != nil {
+		return err
+	}
+
+	if err := out.valueLabelRecords(); err != nil {
+		return err
+	}
+
+	if err := out.machineIntegerInfoRecord(); err != nil {
+		return err
+	}
+
+	if err := out.machineFloatingPointInfoRecord(); err != nil {
+		return err
+	}
+
+	if err := out.variableDisplayParameterRecord(); err != nil {
+		return err
+	}
+
+	if err := out.longVarNameRecords(); err != nil {
+		return err
+	}
+
+	if err := out.veryLongStringRecord(); err != nil {
+		return err
+	}
+
+	if err := out.encodingRecord(); err != nil {
+		return err
+	}
+
+	if err := out.longStringValueLabelsRecord(); err != nil {
+		return err
+	}
+
+	if err := out.terminationRecord(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (out *SpssWriter) Finish() {
-	out.updateHeaderNCases()
+func (out *SpssWriter) Finish() error {
+	return out.updateHeaderNCases()
 }

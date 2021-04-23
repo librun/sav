@@ -41,7 +41,9 @@ func TestCreateSavFileLongText(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	savFile.WriteVal(vals)
+	if err := savFile.WriteVal(vals); err != nil {
+		log.Fatal(err)
+	}
 
 	if err := savFile.Close(); err != nil {
 		log.Fatal(err)
