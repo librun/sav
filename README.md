@@ -3,7 +3,8 @@ README
 
 TODO: create native generate sav from struct
 
-Repository has been moved to: https://bitbucket.org/bergenquete/xml2sav
+Repository based from: https://bitbucket.org/bergenquete/xml2sav
+Repository based from: https://github.com/j0ran/xml2sav
 
 XML to SPSS Converter (xml2sav) - Version 2
 -------------------------------------------
